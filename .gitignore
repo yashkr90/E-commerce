@@ -1,0 +1,67 @@
+@"
+# ── Java / Maven ─────────────────────────────────────────────────────────────
+target/
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# ── Spring Boot ───────────────────────────────────────────────────────────────
+*.log
+spring-shell.log
+
+# ── Node / React ──────────────────────────────────────────────────────────────
+node_modules/
+frontend/build/
+frontend/.pnp
+frontend/.pnp.js
+frontend/coverage/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── Environment / Secrets ────────────────────────────────────────────────────
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+application-local.properties
+application-prod.properties
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.project
+.classpath
+.settings/
+.factorypath
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ── Database ──────────────────────────────────────────────────────────────────
+*.sql.bak
+pgdata/
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+docker-compose.override.yml
+"@ | Set-Content -Path "C:\Vscode\capstone\.gitignore" -Encoding UTF8
