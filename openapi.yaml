@@ -1,564 +1,547 @@
 openapi: 3.0.3
 info:
   title: E-Bookstore API
-  description: OpenAPI specification for the E-Bookstore eCommerce platform (Capstone Project)
   version: 1.0.0
-  contact:
-    name: Capstone Team
+  description: |
+    REST API for the E-Bookstore capstone platform (Spring Boot 3 + PostgreSQL).
+    This specification documents the API as implemented in `backend/`.
 
+    **Authentication**
+    - Call `POST /auth/register` or `POST /auth/login` to get a JWT.
+    - Send it as `Authorization: Bearer <token>`. Tokens expire after 24 hours.
+    - Public (no token): every method under `/auth`, `/categories`, `/brands` and `/products`.
+    - Every other endpoint needs a token. A missing or invalid token returns **403**.
+    - The API checks only that the caller is logged in, not that the `userId`
+      in the path is theirs.
+
+    **Errors**
+    - Every application error, including "not found", validation failures,
+      bad login and business-rule violations, returns **400** with an `ErrorResponse` body.
+
+    **Response shapes**
+    - Most endpoints return database entities directly. Back-references are hidden,
+      so `Cart`, `Order` and `Payment` do not include `userId` or `orderId`.
 servers:
   - url: http://localhost:8080/api
-    description: Local development server
-
+    description: Local backend
 tags:
   - name: Auth
-    description: User authentication and registration
   - name: Users
-    description: User profile management
-  - name: Categories
-    description: Product categories
-  - name: Brands
-    description: Book brands/publishers
-  - name: Products
-    description: Book products
-  - name: Cart
-    description: Shopping cart operations
-  - name: Orders
-    description: Order management
   - name: Addresses
-    description: Delivery address management
+  - name: Categories
+  - name: Brands
+    description: Book publishers
+  - name: Products
+    description: Books
+  - name: Cart
+  - name: Orders
   - name: Payments
-    description: Payment processing
   - name: Recommendations
-    description: AI-style product recommendations
+
+security:
+  - BearerAuth: []
 
 paths:
-  # ── AUTH ──────────────────────────────────────────────────────────────────
   /auth/register:
     post:
       tags: [Auth]
-      summary: Register a new user
+      summary: Register a new customer
+      security: []
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/RegisterRequest'
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
       responses:
         '201':
-          description: User registered successfully
+          description: Registered; returns a JWT
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/AuthResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
 
   /auth/login:
     post:
       tags: [Auth]
-      summary: Login with email and password
+      summary: Log in with email and password
+      security: []
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/LoginRequest'
+            schema: { $ref: '#/components/schemas/LoginRequest' }
       responses:
         '200':
-          description: Login successful
+          description: Logged in; returns a JWT
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/AuthResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '400':
+          description: Invalid credentials or validation failure
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
 
-  # ── USERS ─────────────────────────────────────────────────────────────────
   /users/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
     get:
       tags: [Users]
-      summary: Get user profile
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/UserId'
+      summary: Get a user profile
       responses:
         '200':
           description: User profile
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/User'
+              schema: { $ref: '#/components/schemas/User' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
     put:
       tags: [Users]
-      summary: Update user profile
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/UserId'
+      summary: Update first and/or last name
+      description: Omitted fields are left unchanged.
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateUserRequest'
+            schema: { $ref: '#/components/schemas/UpdateUserRequest' }
       responses:
         '200':
-          description: Updated user
+          description: Updated profile
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/User'
+              schema: { $ref: '#/components/schemas/User' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
-  # ── CATEGORIES ────────────────────────────────────────────────────────────
-  /categories:
-    get:
-      tags: [Categories]
-      summary: List all categories
-      responses:
-        '200':
-          description: List of categories
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Category'
-    post:
-      tags: [Categories]
-      summary: Create a category
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CategoryRequest'
-      responses:
-        '201':
-          description: Created category
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Category'
-
-  /categories/{categoryId}:
-    get:
-      tags: [Categories]
-      summary: Get a category by ID
-      parameters:
-        - $ref: '#/components/parameters/CategoryId'
-      responses:
-        '200':
-          description: Category details
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Category'
-
-  # ── BRANDS ────────────────────────────────────────────────────────────────
-  /brands:
-    get:
-      tags: [Brands]
-      summary: List all brands/publishers
-      responses:
-        '200':
-          description: List of brands
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Brand'
-    post:
-      tags: [Brands]
-      summary: Create a brand
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/BrandRequest'
-      responses:
-        '201':
-          description: Created brand
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Brand'
-
-  # ── PRODUCTS ──────────────────────────────────────────────────────────────
-  /products:
-    get:
-      tags: [Products]
-      summary: List / search products
-      parameters:
-        - name: categoryId
-          in: query
-          schema:
-            type: integer
-        - name: brandId
-          in: query
-          schema:
-            type: integer
-        - name: search
-          in: query
-          schema:
-            type: string
-        - name: page
-          in: query
-          schema:
-            type: integer
-            default: 0
-        - name: size
-          in: query
-          schema:
-            type: integer
-            default: 20
-      responses:
-        '200':
-          description: Paginated product list
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProductPage'
-    post:
-      tags: [Products]
-      summary: Create a product
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ProductRequest'
-      responses:
-        '201':
-          description: Created product
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Product'
-
-  /products/{productId}:
-    get:
-      tags: [Products]
-      summary: Get product details
-      parameters:
-        - $ref: '#/components/parameters/ProductId'
-      responses:
-        '200':
-          description: Product details
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Product'
-    put:
-      tags: [Products]
-      summary: Update a product
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/ProductId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ProductRequest'
-      responses:
-        '200':
-          description: Updated product
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Product'
-    delete:
-      tags: [Products]
-      summary: Delete a product
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/ProductId'
-      responses:
-        '204':
-          description: Product deleted
-
-  /products/{productId}/related:
-    get:
-      tags: [Products]
-      summary: Get related products
-      parameters:
-        - $ref: '#/components/parameters/ProductId'
-      responses:
-        '200':
-          description: Related products list
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Product'
-
-  # ── CART ──────────────────────────────────────────────────────────────────
-  /cart/{userId}:
-    get:
-      tags: [Cart]
-      summary: Get cart for user
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/UserId'
-      responses:
-        '200':
-          description: Cart contents
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Cart'
-
-  /cart/{userId}/items:
-    post:
-      tags: [Cart]
-      summary: Add item to cart
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/UserId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CartItemRequest'
-      responses:
-        '200':
-          description: Updated cart
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Cart'
-
-  /cart/{userId}/items/{itemId}:
-    put:
-      tags: [Cart]
-      summary: Update cart item quantity
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/UserId'
-        - name: itemId
-          in: path
-          required: true
-          schema:
-            type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CartItemRequest'
-      responses:
-        '200':
-          description: Updated cart
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Cart'
-    delete:
-      tags: [Cart]
-      summary: Remove item from cart
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/UserId'
-        - name: itemId
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        '200':
-          description: Updated cart
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Cart'
-
-  # ── ADDRESSES ─────────────────────────────────────────────────────────────
   /users/{userId}/addresses:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
     get:
       tags: [Addresses]
-      summary: List user addresses
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/UserId'
+      summary: List a user's delivery addresses
       responses:
         '200':
-          description: List of addresses
+          description: Addresses
           content:
             application/json:
               schema:
                 type: array
-                items:
-                  $ref: '#/components/schemas/Address'
+                items: { $ref: '#/components/schemas/Address' }
+        '403': { $ref: '#/components/responses/Forbidden' }
     post:
       tags: [Addresses]
-      summary: Add address
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/UserId'
+      summary: Add a delivery address
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/AddressRequest'
+            schema: { $ref: '#/components/schemas/AddressRequest' }
       responses:
         '201':
           description: Created address
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Address'
+              schema: { $ref: '#/components/schemas/Address' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
-  # ── ORDERS ────────────────────────────────────────────────────────────────
-  /orders:
+  /categories:
+    get:
+      tags: [Categories]
+      summary: List all categories
+      security: []
+      responses:
+        '200':
+          description: Categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Category' }
     post:
-      tags: [Orders]
-      summary: Place a new order
-      security:
-        - BearerAuth: []
+      tags: [Categories]
+      summary: Create a category
+      description: Public; no token required.
+      security: []
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/OrderRequest'
+            schema: { $ref: '#/components/schemas/CategoryRequest' }
+      responses:
+        '201':
+          description: Created category
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Category' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /categories/{categoryId}:
+    get:
+      tags: [Categories]
+      summary: Get a category
+      security: []
+      parameters:
+        - name: categoryId
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200':
+          description: Category
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Category' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /brands:
+    get:
+      tags: [Brands]
+      summary: List all publishers
+      security: []
+      responses:
+        '200':
+          description: Brands
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Brand' }
+    post:
+      tags: [Brands]
+      summary: Create a publisher
+      description: Public; no token required.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BrandRequest' }
+      responses:
+        '201':
+          description: Created brand
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Brand' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /products:
+    get:
+      tags: [Products]
+      summary: List, filter or search books
+      description: |
+        Results are sorted by `createdAt`, newest first.
+        If `search` is given, it matches title, author or description (case-insensitive)
+        and `categoryId`/`brandId` are ignored. Otherwise the two filters combine.
+      security: []
+      parameters:
+        - name: categoryId
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: brandId
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer, default: 0, minimum: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 20, minimum: 1 }
+      responses:
+        '200':
+          description: One page of products
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductPage' }
+    post:
+      tags: [Products]
+      summary: Create a book
+      description: Public; no token required.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProductRequest' }
+      responses:
+        '201':
+          description: Created product
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Product' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /products/{productId}:
+    parameters:
+      - $ref: '#/components/parameters/ProductId'
+    get:
+      tags: [Products]
+      summary: Get a book
+      security: []
+      responses:
+        '200':
+          description: Product
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Product' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+    put:
+      tags: [Products]
+      summary: Replace a book's details
+      description: Public; no token required. All fields are replaced.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProductRequest' }
+      responses:
+        '200':
+          description: Updated product
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Product' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+    delete:
+      tags: [Products]
+      summary: Delete a book
+      description: Public; no token required.
+      security: []
+      responses:
+        '204':
+          description: Deleted
+
+  /products/{productId}/related:
+    get:
+      tags: [Products]
+      summary: Other books in the same category
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      responses:
+        '200':
+          description: Related products (unpaged)
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Product' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /cart/{userId}:
+    get:
+      tags: [Cart]
+      summary: Get a user's cart
+      description: Creates an empty cart if the user has none yet.
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: Cart
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cart' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /cart/{userId}/items:
+    post:
+      tags: [Cart]
+      summary: Add a book to the cart
+      description: If the book is already in the cart, the quantity is added to it.
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CartItemRequest' }
+      responses:
+        '200':
+          description: Updated cart
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cart' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /cart/{userId}/items/{itemId}:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+      - name: itemId
+        in: path
+        required: true
+        description: Cart item ID (not product ID)
+        schema: { type: integer, format: int64 }
+    put:
+      tags: [Cart]
+      summary: Set a cart item's quantity
+      description: |
+        `productId` must be present but is ignored. An unknown `itemId` is ignored
+        and the cart is returned unchanged.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CartItemRequest' }
+      responses:
+        '200':
+          description: Updated cart
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cart' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    delete:
+      tags: [Cart]
+      summary: Remove an item from the cart
+      responses:
+        '200':
+          description: Updated cart
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cart' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /orders:
+    post:
+      tags: [Orders]
+      summary: Place an order
+      description: |
+        Prices come from the current product prices. The order is created as `CONFIRMED`,
+        with delivery set to today + 5 days.
+        Gift points: each point redeemed takes $0.01 off the total. Points are applied only
+        if the user has enough; otherwise they are ignored. The user then earns one point
+        per whole dollar of the final total.
+        The cart is not changed and stock is not reduced.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OrderRequest' }
       responses:
         '201':
           description: Order placed
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Order'
+              schema: { $ref: '#/components/schemas/Order' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /orders/user/{userId}:
     get:
       tags: [Orders]
-      summary: Get order history for user
-      security:
-        - BearerAuth: []
+      summary: Order history, newest first
       parameters:
         - $ref: '#/components/parameters/UserId'
       responses:
         '200':
-          description: Order list
+          description: Orders
           content:
             application/json:
               schema:
                 type: array
-                items:
-                  $ref: '#/components/schemas/Order'
+                items: { $ref: '#/components/schemas/Order' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /orders/{orderId}:
     get:
       tags: [Orders]
-      summary: Get order by ID
-      security:
-        - BearerAuth: []
+      summary: Get an order
       parameters:
         - $ref: '#/components/parameters/OrderId'
       responses:
         '200':
-          description: Order details
+          description: Order
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Order'
+              schema: { $ref: '#/components/schemas/Order' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /orders/{orderId}/cancel:
     put:
       tags: [Orders]
-      summary: Cancel order within 48 hours
-      security:
-        - BearerAuth: []
+      summary: Cancel an order
+      description: |
+        Allowed only within 48 hours of placing the order, and only if it is not `DELIVERED`.
+        Cancelling does not refund the payment, restore stock or return gift points.
       parameters:
         - $ref: '#/components/parameters/OrderId'
       responses:
         '200':
-          description: Order cancelled
+          description: Cancelled order
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Order'
+              schema: { $ref: '#/components/schemas/Order' }
+        '400':
+          description: Older than 48 hours, already delivered, or order not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
-  # ── PAYMENTS ──────────────────────────────────────────────────────────────
   /payments:
     post:
       tags: [Payments]
-      summary: Process payment for an order
-      security:
-        - BearerAuth: []
+      summary: Pay for an order (mocked)
+      description: |
+        Always succeeds with a random `transactionId`. Card fields are accepted but are
+        not checked or stored, and `amount` is not compared with the order total.
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/PaymentRequest'
+            schema: { $ref: '#/components/schemas/PaymentRequest' }
       responses:
         '200':
-          description: Payment result
+          description: Payment recorded
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Payment'
+              schema: { $ref: '#/components/schemas/Payment' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /payments/{paymentId}:
     get:
       tags: [Payments]
-      summary: Get payment details
-      security:
-        - BearerAuth: []
+      summary: Get a payment
       parameters:
         - name: paymentId
           in: path
           required: true
-          schema:
-            type: integer
+          schema: { type: integer, format: int64 }
       responses:
         '200':
-          description: Payment details
+          description: Payment
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Payment'
+              schema: { $ref: '#/components/schemas/Payment' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
-  # ── RECOMMENDATIONS ───────────────────────────────────────────────────────
   /recommendations/{userId}:
     get:
       tags: [Recommendations]
-      summary: Get personalized recommendations based on order history
-      security:
-        - BearerAuth: []
+      summary: Books recommended from order history
+      description: |
+        Books the user has ordered, most-ordered first. Users with no orders get
+        6 products from the catalogue instead.
       parameters:
         - $ref: '#/components/parameters/UserId'
       responses:
         '200':
-          description: Recommended products
+          description: Products
           content:
             application/json:
               schema:
                 type: array
-                items:
-                  $ref: '#/components/schemas/Product'
+                items: { $ref: '#/components/schemas/Product' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
 components:
   securitySchemes:
@@ -572,405 +555,271 @@ components:
       name: userId
       in: path
       required: true
-      schema:
-        type: integer
-    CategoryId:
-      name: categoryId
-      in: path
-      required: true
-      schema:
-        type: integer
+      schema: { type: integer, format: int64 }
     ProductId:
       name: productId
       in: path
       required: true
-      schema:
-        type: integer
+      schema: { type: integer, format: int64 }
     OrderId:
       name: orderId
       in: path
       required: true
-      schema:
-        type: integer
+      schema: { type: integer, format: int64 }
 
   responses:
     BadRequest:
-      description: Bad request
+      description: Validation failure, entity not found, or business-rule violation
       content:
         application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-    Unauthorized:
-      description: Unauthorized
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-    NotFound:
-      description: Not found
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Forbidden:
+      description: Missing, invalid or expired JWT (empty body)
 
   schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        timestamp: { type: string, format: date-time }
+        status: { type: integer, example: 400 }
+        error: { type: string, example: Bad Request }
+        message:
+          type: string
+          description: "Exception message, or the first validation error as `field: message`"
+          example: 'Product not found: 99'
+
     RegisterRequest:
       type: object
       required: [firstName, lastName, email, password]
       properties:
-        firstName:
-          type: string
-        lastName:
-          type: string
-        email:
-          type: string
-          format: email
-        password:
-          type: string
-          minLength: 6
+        firstName: { type: string, minLength: 1 }
+        lastName: { type: string, minLength: 1 }
+        email: { type: string, format: email }
+        password: { type: string, minLength: 6 }
 
     LoginRequest:
       type: object
       required: [email, password]
       properties:
-        email:
-          type: string
-          format: email
-        password:
-          type: string
+        email: { type: string, format: email }
+        password: { type: string }
 
     AuthResponse:
       type: object
       properties:
-        token:
-          type: string
-        user:
-          $ref: '#/components/schemas/User'
+        token: { type: string, description: 'JWT (HS256), valid 24 hours' }
+        user: { $ref: '#/components/schemas/User' }
 
     User:
       type: object
       properties:
-        id:
-          type: integer
-        firstName:
-          type: string
-        lastName:
-          type: string
-        email:
-          type: string
-        giftPoints:
-          type: integer
-        createdAt:
-          type: string
-          format: date-time
+        id: { type: integer, format: int64 }
+        firstName: { type: string }
+        lastName: { type: string }
+        email: { type: string, format: email }
+        giftPoints: { type: integer }
+        createdAt: { type: string, format: date-time }
 
     UpdateUserRequest:
       type: object
       properties:
-        firstName:
-          type: string
-        lastName:
-          type: string
-
-    Category:
-      type: object
-      properties:
-        id:
-          type: integer
-        name:
-          type: string
-        description:
-          type: string
-        imageUrl:
-          type: string
-
-    CategoryRequest:
-      type: object
-      required: [name]
-      properties:
-        name:
-          type: string
-        description:
-          type: string
-        imageUrl:
-          type: string
-
-    Brand:
-      type: object
-      properties:
-        id:
-          type: integer
-        name:
-          type: string
-        logoUrl:
-          type: string
-
-    BrandRequest:
-      type: object
-      required: [name]
-      properties:
-        name:
-          type: string
-        logoUrl:
-          type: string
-
-    Product:
-      type: object
-      properties:
-        id:
-          type: integer
-        title:
-          type: string
-        author:
-          type: string
-        description:
-          type: string
-        price:
-          type: number
-          format: double
-        stockQuantity:
-          type: integer
-        imageUrl:
-          type: string
-        estimatedDeliveryDays:
-          type: integer
-        category:
-          $ref: '#/components/schemas/Category'
-        brand:
-          $ref: '#/components/schemas/Brand'
-        createdAt:
-          type: string
-          format: date-time
-
-    ProductRequest:
-      type: object
-      required: [title, author, price, categoryId, brandId]
-      properties:
-        title:
-          type: string
-        author:
-          type: string
-        description:
-          type: string
-        price:
-          type: number
-        stockQuantity:
-          type: integer
-        imageUrl:
-          type: string
-        estimatedDeliveryDays:
-          type: integer
-        categoryId:
-          type: integer
-        brandId:
-          type: integer
-
-    ProductPage:
-      type: object
-      properties:
-        content:
-          type: array
-          items:
-            $ref: '#/components/schemas/Product'
-        totalElements:
-          type: integer
-        totalPages:
-          type: integer
-        number:
-          type: integer
-        size:
-          type: integer
-
-    Cart:
-      type: object
-      properties:
-        id:
-          type: integer
-        userId:
-          type: integer
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/CartItem'
-        totalAmount:
-          type: number
-
-    CartItem:
-      type: object
-      properties:
-        id:
-          type: integer
-        product:
-          $ref: '#/components/schemas/Product'
-        quantity:
-          type: integer
-        subtotal:
-          type: number
-
-    CartItemRequest:
-      type: object
-      required: [productId, quantity]
-      properties:
-        productId:
-          type: integer
-        quantity:
-          type: integer
+        firstName: { type: string }
+        lastName: { type: string }
 
     Address:
       type: object
       properties:
-        id:
-          type: integer
-        fullName:
-          type: string
-        street:
-          type: string
-        city:
-          type: string
-        state:
-          type: string
-        postalCode:
-          type: string
-        country:
-          type: string
-        isDefault:
-          type: boolean
+        id: { type: integer, format: int64 }
+        fullName: { type: string }
+        street: { type: string }
+        city: { type: string }
+        state: { type: string }
+        postalCode: { type: string }
+        country: { type: string }
+        isDefault: { type: boolean }
 
     AddressRequest:
       type: object
       required: [fullName, street, city, state, postalCode, country]
       properties:
-        fullName:
-          type: string
-        street:
-          type: string
-        city:
-          type: string
-        state:
-          type: string
-        postalCode:
-          type: string
-        country:
-          type: string
-        isDefault:
-          type: boolean
+        fullName: { type: string, minLength: 1 }
+        street: { type: string, minLength: 1 }
+        city: { type: string, minLength: 1 }
+        state: { type: string, minLength: 1 }
+        postalCode: { type: string, minLength: 1 }
+        country: { type: string, minLength: 1 }
+        isDefault: { type: boolean, default: false }
+
+    Category:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        imageUrl: { type: string, nullable: true }
+
+    CategoryRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, description: Must be unique }
+        description: { type: string }
+        imageUrl: { type: string }
+
+    Brand:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        logoUrl: { type: string, nullable: true }
+
+    BrandRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, description: Must be unique }
+        logoUrl: { type: string }
+
+    Product:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        title: { type: string }
+        author: { type: string }
+        description: { type: string, nullable: true }
+        price: { type: number, example: 12.99 }
+        stockQuantity: { type: integer, description: Display only; never reduced by orders }
+        imageUrl: { type: string, nullable: true }
+        estimatedDeliveryDays: { type: integer, description: Display only; orders always use 5 days }
+        category: { $ref: '#/components/schemas/Category' }
+        brand: { $ref: '#/components/schemas/Brand' }
+        createdAt: { type: string, format: date-time }
+
+    ProductRequest:
+      type: object
+      required: [title, author, price, categoryId, brandId]
+      properties:
+        title: { type: string, minLength: 1 }
+        author: { type: string, minLength: 1 }
+        description: { type: string }
+        price: { type: number, exclusiveMinimum: true, minimum: 0 }
+        stockQuantity: { type: integer, default: 0 }
+        imageUrl: { type: string }
+        estimatedDeliveryDays: { type: integer, default: 5 }
+        categoryId: { type: integer, format: int64 }
+        brandId: { type: integer, format: int64 }
+
+    ProductPage:
+      type: object
+      description: Spring Data page
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/Product' }
+        totalElements: { type: integer, format: int64 }
+        totalPages: { type: integer }
+        number: { type: integer, description: Zero-based page index }
+        size: { type: integer }
+        numberOfElements: { type: integer }
+        first: { type: boolean }
+        last: { type: boolean }
+        empty: { type: boolean }
+        pageable: { type: object, description: Spring paging metadata }
+        sort: { type: object, description: Spring sort metadata }
+
+    Cart:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/CartItem' }
+        totalAmount: { type: number, description: Sum of item subtotals at current prices }
+
+    CartItem:
+      type: object
+      properties:
+        id: { type: integer, format: int64, description: Use this as itemId in cart item URLs }
+        product: { $ref: '#/components/schemas/Product' }
+        quantity: { type: integer }
+        subtotal: { type: number, description: product.price * quantity }
+
+    CartItemRequest:
+      type: object
+      required: [productId, quantity]
+      properties:
+        productId: { type: integer, format: int64 }
+        quantity: { type: integer, minimum: 1 }
 
     Order:
       type: object
       properties:
-        id:
-          type: integer
-        userId:
-          type: integer
+        id: { type: integer, format: int64 }
+        address: { $ref: '#/components/schemas/Address' }
         items:
           type: array
-          items:
-            $ref: '#/components/schemas/OrderItem'
-        address:
-          $ref: '#/components/schemas/Address'
-        totalAmount:
-          type: number
-        giftPointsUsed:
-          type: integer
-        status:
-          type: string
-          enum: [PENDING, CONFIRMED, SHIPPED, DELIVERED, CANCELLED]
-        estimatedDeliveryDate:
-          type: string
-          format: date
-        createdAt:
-          type: string
-          format: date-time
+          items: { $ref: '#/components/schemas/OrderItem' }
+        totalAmount: { type: number, description: Total after the gift-point discount }
+        giftPointsUsed: { type: integer, description: "Points requested, even if they were not applied" }
+        status: { $ref: '#/components/schemas/OrderStatus' }
+        estimatedDeliveryDate: { type: string, format: date }
+        createdAt: { type: string, format: date-time }
+
+    OrderStatus:
+      type: string
+      enum: [PENDING, CONFIRMED, SHIPPED, DELIVERED, CANCELLED]
 
     OrderItem:
       type: object
       properties:
-        id:
-          type: integer
-        product:
-          $ref: '#/components/schemas/Product'
-        quantity:
-          type: integer
-        unitPrice:
-          type: number
-        subtotal:
-          type: number
+        id: { type: integer, format: int64 }
+        product: { $ref: '#/components/schemas/Product' }
+        quantity: { type: integer }
+        unitPrice: { type: number, description: Product price when the order was placed }
+        subtotal: { type: number }
 
     OrderRequest:
       type: object
       required: [userId, addressId, items]
       properties:
-        userId:
-          type: integer
-        addressId:
-          type: integer
-        giftPointsToRedeem:
-          type: integer
-          default: 0
+        userId: { type: integer, format: int64 }
+        addressId: { type: integer, format: int64 }
+        giftPointsToRedeem: { type: integer, default: 0, minimum: 0 }
         items:
           type: array
           items:
             type: object
+            required: [productId, quantity]
             properties:
-              productId:
-                type: integer
-              quantity:
-                type: integer
+              productId: { type: integer, format: int64 }
+              quantity: { type: integer }
 
     Payment:
       type: object
       properties:
-        id:
-          type: integer
-        orderId:
-          type: integer
-        amount:
-          type: number
-        method:
-          type: string
-          enum: [CREDIT_CARD, DEBIT_CARD, NET_BANKING, GIFT_POINTS]
+        id: { type: integer, format: int64 }
+        amount: { type: number }
+        method: { $ref: '#/components/schemas/PaymentMethod' }
         status:
           type: string
           enum: [PENDING, SUCCESS, FAILED, REFUNDED]
-        transactionId:
-          type: string
-        createdAt:
-          type: string
-          format: date-time
+          description: Always SUCCESS in the current implementation
+        transactionId: { type: string, format: uuid }
+        createdAt: { type: string, format: date-time }
+
+    PaymentMethod:
+      type: string
+      enum: [CREDIT_CARD, DEBIT_CARD, NET_BANKING, GIFT_POINTS]
 
     PaymentRequest:
       type: object
       required: [orderId, method, amount]
       properties:
-        orderId:
-          type: integer
-        method:
-          type: string
-          enum: [CREDIT_CARD, DEBIT_CARD, NET_BANKING, GIFT_POINTS]
-        amount:
-          type: number
-        cardNumber:
-          type: string
-        cardHolderName:
-          type: string
-        expiryMonth:
-          type: integer
-        expiryYear:
-          type: integer
-        cvv:
-          type: string
-
-    ErrorResponse:
-      type: object
-      properties:
-        timestamp:
-          type: string
-          format: date-time
-        status:
-          type: integer
-        error:
-          type: string
-        message:
-          type: string
-        path:
-          type: string
+        orderId: { type: integer, format: int64 }
+        method: { $ref: '#/components/schemas/PaymentMethod' }
+        amount: { type: number, exclusiveMinimum: true, minimum: 0 }
+        cardNumber: { type: string, description: Accepted but ignored }
+        cardHolderName: { type: string, description: Accepted but ignored }
+        expiryMonth: { type: integer, description: Accepted but ignored }
+        expiryYear: { type: integer, description: Accepted but ignored }
+        cvv: { type: string, description: Accepted but ignored }

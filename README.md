@@ -2,7 +2,7 @@
 
 A full-stack eCommerce platform for browsing, selecting, and purchasing books, built using:
 - **Backend:** Spring Boot 3 (Java 17) + PostgreSQL + JWT Auth
-- **Frontend:** React 18 + React Router v6
+- **Frontend:** React 18 + Vite + React Router v6
 - **AI-Assisted Development:** IBM BOB (Agentic IDE)
 
 ---
@@ -109,7 +109,7 @@ cd backend
 ```bash
 cd frontend
 npm install
-npm start
+npm run dev
 # UI available at http://localhost:3000
 ```
 
@@ -160,7 +160,7 @@ git push origin feature/api-implementation
 | Backend    | Spring Boot 3.2, Java 17      |
 | Database   | PostgreSQL 14+                |
 | Security   | Spring Security + JWT (jjwt)  |
-| Frontend   | React 18, React Router v6     |
+| Frontend   | React 18, Vite 6, React Router v6 |
 | HTTP Client| Axios                         |
 | Build      | Maven (backend), npm (frontend)|
 | IDE        | IBM BOB (Agentic AI IDE)      |
